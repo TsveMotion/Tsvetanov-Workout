@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Tsvetanov Workout Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Brilliant Blues -->
+    <!-- Application Structure Plan: A comprehensive dashboard SPA. The top section remains a task-oriented workout viewer. Below, two new interactive sections are added: "Log Your Progress" and "Visualize Your Progress". The logging section uses forms to capture workout and body measurement data, storing it in local JS arrays. The visualization section contains dynamic, customizable charts that update based on user selections (dropdowns for exercises/metrics, checkboxes for body parts). This structure separates the core tasks (viewing, logging, analyzing) into distinct, user-friendly modules. -->
+    <!-- Visualization & Content Choices: 
+        - Workout Viewer (Organize/Interact): Retains the successful tab-based system.
+        - Data Logging (Inform/Interact): Uses standard HTML forms for data entry. Justification: Most intuitive method for user input.
+        - Customizable Workout Graph (Relationships/Change): A line chart (Chart.js/Canvas) with interactive dropdowns to select the exercise and metric (Max Weight, Volume, Reps). Justification: Empowers the user to explore specific performance trends and relationships over time.
+        - Customizable Body Measurement Graph (Change): A line chart (Chart.js/Canvas) with interactive checkboxes for metrics (Weight, Waist, etc.). Justification: Allows the user to compare multiple body composition trends simultaneously.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 45vh;
+            max-height: 500px;
+        }
+        .nav-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .nav-btn.active {
+            background-color: #003B73;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .workout-content, .edit-mode {
+            display: none;
+        }
+        .workout-content.active, .edit-mode.active {
+            display: block;
+        }
+        input, select {
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.75rem;
+        }
+        .modal-overlay {
+            transition: opacity 0.3s ease;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #0074D9;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8">
+        
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-[#003B73] mb-2">The Tsvetanov Workout</h1>
+            <p class="text-lg text-[#0074D9]">Your AI-powered dashboard for planning, tracking, and visualizing progress.</p>
+        </header>
+
+        <main class="bg-white rounded-lg shadow-lg p-6 md:p-8">
+            <h2 class="text-2xl font-bold text-center text-[#003B73] mb-6">Daily Workout Plan</h2>
+            <nav id="workout-nav" class="flex flex-wrap justify-center gap-3 mb-8">
+                <button data-target="monday" class="nav-btn active text-lg font-semibold py-3 px-6 bg-white text-[#0074D9] rounded-lg shadow-md border-2 border-[#0074D9] hover:bg-[#0074D9] hover:text-white">Monday</button>
+                <button data-target="tuesday" class="nav-btn text-lg font-semibold py-3 px-6 bg-white text-[#0074D9] rounded-lg shadow-md border-2 border-[#0074D9] hover:bg-[#0074D9] hover:text-white">Tuesday</button>
+                <button data-target="wednesday" class="nav-btn text-lg font-semibold py-3 px-6 bg-white text-[#0074D9] rounded-lg shadow-md border-2 border-[#0074D9] hover:bg-[#0074D9] hover:text-white">Wednesday</button>
+                <button data-target="thursday" class="nav-btn text-lg font-semibold py-3 px-6 bg-white text-[#0074D9] rounded-lg shadow-md border-2 border-[#0074D9] hover:bg-[#0074D9] hover:text-white">Thursday</button>
+                <button data-target="friday" class="nav-btn text-lg font-semibold py-3 px-6 bg-white text-[#0074D9] rounded-lg shadow-md border-2 border-[#0074D9] hover:bg-[#0074D9] hover:text-white">Friday</button>
+            </nav>
+            <div id="workouts-container"></div>
+        </main>
+
+        <section class="bg-white rounded-lg shadow-lg p-6 md:p-8 mt-12">
+            <h2 class="text-2xl font-bold text-center text-[#003B73] mb-6">Log Your Progress</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div id="log-workout-section" class="bg-gray-50 p-6 rounded-lg border">
+                    <h3 class="font-bold text-lg mb-4 text-[#003B73]">Log Daily Workout (<span id="log-day-title">Monday</span>)</h3>
+                    <form id="workout-log-form" class="space-y-4">
+                        <div class="flex items-end gap-4">
+                            <div class="flex-grow">
+                                <label for="exercise-select" class="block text-sm font-medium text-gray-700">Exercise</label>
+                                <select id="exercise-select" name="exercise" class="mt-1 block w-full"></select>
+                            </div>
+                            <button type="button" id="get-form-tips-btn" class="flex-shrink-0 text-sm bg-blue-100 text-[#0074D9] hover:bg-blue-200 font-semibold py-2 px-3 rounded-lg">✨ Get Form Tips</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                             <div><label for="set1-weight" class="block text-sm font-medium">Set 1 Weight (kg)</label><input type="number" step="0.25" id="set1-weight" name="s1w" class="w-full mt-1" placeholder="0"></div>
+                             <div><label for="set1-reps" class="block text-sm font-medium">Set 1 Reps</label><input type="number" id="set1-reps" name="s1r" class="w-full mt-1" placeholder="0"></div>
+                             <div><label for="set2-weight" class="block text-sm font-medium">Set 2 Weight (kg)</label><input type="number" step="0.25" id="set2-weight" name="s2w" class="w-full mt-1" placeholder="0"></div>
+                             <div><label for="set2-reps" class="block text-sm font-medium">Set 2 Reps</label><input type="number" id="set2-reps" name="s2r" class="w-full mt-1" placeholder="0"></div>
+                             <div><label for="set3-weight" class="block text-sm font-medium">Set 3 Weight (kg)</label><input type="number" step="0.25" id="set3-weight" name="s3w" class="w-full mt-1" placeholder="0"></div>
+                             <div><label for="set3-reps" class="block text-sm font-medium">Set 3 Reps</label><input type="number" id="set3-reps" name="s3r" class="w-full mt-1" placeholder="0"></div>
+                        </div>
+                        <button type="submit" class="w-full text-white bg-[#0074D9] hover:bg-[#003B73] font-bold py-2 px-4 rounded-lg">Log Workout</button>
+                    </form>
+                </div>
+
+                <div id="log-body-section" class="bg-gray-50 p-6 rounded-lg border">
+                     <h3 class="font-bold text-lg mb-4 text-[#003B73]">Log Weekly Measurements</h3>
+                     <form id="body-log-form" class="space-y-4">
+                         <div class="grid grid-cols-2 gap-4">
+                            <div><label for="body-weight" class="block text-sm font-medium">Weight (kg)</label><input type="number" step="0.1" id="body-weight" class="w-full mt-1" placeholder="0"></div>
+                            <div><label for="body-fat" class="block text-sm font-medium">Body Fat %</label><input type="number" step="0.1" id="body-fat" class="w-full mt-1" placeholder="0"></div>
+                            <div><label for="waist" class="block text-sm font-medium">Waist (cm)</label><input type="number" step="0.1" id="waist" class="w-full mt-1" placeholder="0"></div>
+                            <div><label for="chest" class="block text-sm font-medium">Chest (cm)</label><input type="number" step="0.1" id="chest" class="w-full mt-1" placeholder="0"></div>
+                            <div><label for="arms" class="block text-sm font-medium">Arms (cm)</label><input type="number" step="0.1" id="arms" class="w-full mt-1" placeholder="0"></div>
+                            <div><label for="legs" class="block text-sm font-medium">Legs (cm)</label><input type="number" step="0.1" id="legs" class="w-full mt-1" placeholder="0"></div>
+                         </div>
+                         <button type="submit" class="w-full text-white bg-[#0074D9] hover:bg-[#003B73] font-bold py-2 px-4 rounded-lg">Log Measurements</button>
+                     </form>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-lg shadow-lg p-6 md:p-8 mt-12">
+            <h2 class="text-2xl font-bold text-center text-[#003B73] mb-4">✨ AI Coach Summary</h2>
+            <p class="text-center text-gray-600 mb-6 max-w-3xl mx-auto">Get personalized feedback on your week's performance. Log at least one workout to enable this feature.</p>
+            <div class="text-center">
+                <button id="generate-summary-btn" class="bg-[#0074D9] hover:bg-[#003B73] text-white font-bold py-3 px-6 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>Generate Weekly Summary</button>
+            </div>
+            <div id="ai-summary-container" class="mt-6 p-4 bg-gray-50 rounded-lg border hidden prose max-w-none">
+                <div id="ai-summary-spinner" class="text-center hidden">
+                     <div class="spinner mx-auto"></div>
+                     <p class="mt-2 text-gray-600">Your AI coach is analyzing your performance...</p>
+                </div>
+                <div id="ai-summary-content"></div>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-lg shadow-lg p-6 md:p-8 mt-12">
+            <h2 class="text-2xl font-bold text-center text-[#003B73] mb-6">Visualize Your Progress</h2>
+            <div class="space-y-8">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 border-b pb-8">
+                    <div>
+                        <h3 class="font-bold text-lg mb-4 text-center text-[#003B73]">Total Weekly Volume</h3>
+                         <div class="chart-container">
+                            <canvas id="totalVolumeChart"></canvas>
+                        </div>
+                    </div>
+                     <div>
+                        <h3 class="font-bold text-lg mb-4 text-center text-[#003B73]">Muscle Group Volume Distribution</h3>
+                         <div class="chart-container">
+                            <canvas id="muscleGroupChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="font-bold text-lg mb-4 text-center text-[#003B73]">Workout Performance Over Time</h3>
+                        <div class="flex justify-center gap-4 mb-4">
+                            <select id="graph-exercise-select" class="w-1/2"></select>
+                            <select id="graph-metric-select" class="w-1/2">
+                                <option value="maxWeight">Max Weight</option>
+                                <option value="volume">Volume</option>
+                                <option value="totalReps">Total Reps</option>
+                            </select>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="workoutProgressChart"></canvas>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg mb-4 text-center text-[#003B73]">Body Measurement Trends</h3>
+                        <div id="body-metrics-toggles" class="flex flex-wrap justify-center gap-x-4 gap-y-2 mb-4"></div>
+                        <div class="chart-container">
+                            <canvas id="bodyProgressChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+    
+    <div id="edit-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 hidden opacity-0">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
+            <h3 id="edit-modal-title" class="text-xl font-bold text-[#003B73] mb-4">Edit Workout</h3>
+            <div id="edit-modal-body" class="space-y-4 max-h-[60vh] overflow-y-auto"></div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button id="cancel-edit-btn" class="py-2 px-4 bg-gray-300 hover:bg-gray-400 rounded-lg">Cancel</button>
+                <button id="save-edit-btn" class="py-2 px-4 bg-[#0074D9] hover:bg-[#003B73] text-white rounded-lg">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tips-modal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 hidden opacity-0">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+            <h3 id="tips-modal-title" class="text-xl font-bold text-[#003B73] mb-4">Form Tips</h3>
+            <div id="tips-modal-body" class="prose max-w-none">
+                 <div id="tips-spinner" class="text-center hidden">
+                    <div class="spinner mx-auto"></div>
+                    <p class="mt-2 text-gray-600">Getting AI form tips...</p>
+                </div>
+                <div id="tips-content"></div>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button id="close-tips-btn" class="py-2 px-4 bg-gray-300 hover:bg-gray-400 rounded-lg">Close</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        let workoutData = {
+            monday: { title: "Chest & Triceps", tag: "Swim Day", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Barbell Bench Press", target: "8-10 reps"}, {name: "Dumbbell Overhead Tricep Extension", target: "12 reps"}], rest: "75 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "Incline Dumbbell Press", target: "10-12 reps"}, {name: "Push-ups", target: "Max reps"}], rest: "60 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Lying Leg Raises", target: "15 reps"}], rest: "30 seconds" }},
+            tuesday: { title: "Legs", tag: "Walk Only", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Barbell Squats", target: "10 reps"}, {name: "Calf Raises", target: "20 reps"}], rest: "90 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "Dumbbell Romanian Deadlift", target: "10 reps"}, {name: "Walking Lunges", target: "10 reps each leg"}], rest: "75 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Plank", target: "60 seconds"}], rest: "30 seconds" }},
+            wednesday: { title: "Back & Biceps", tag: "Swim Day", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Barbell bent-over row", target: "10-12 reps"}, {name: "Hammer Curls", target: "12 reps"}], rest: "75 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "One-arm dumbbell row", target: "12 reps each side"}, {name: "Barbell Curls", target: "12 reps"}], rest: "60 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Ab roller", target: "8-10 reps"}], rest: "30 seconds" }},
+            thursday: { title: "Shoulders & Core", tag: "Swim Day", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Dumbbell overhead press", target: "10-12 reps"}, {name: "Dumbbell lateral raises", target: "12 reps"}], rest: "75 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "Dumbbell rear delt fly", target: "12 reps"}, {name: "Mountain climbers", target: "30 seconds"}], rest: "60 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Bicycle crunches", target: "20 reps"}, {name: "Flutter kicks", target: "30 seconds"}], rest: "45 seconds" }},
+            friday: { title: "Arms & Endurance", tag: "Swim Day", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Incline barbell bench press", target: "8-10 reps"}, {name: "Barbell Curls", target: "12 reps"}], rest: "75 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "Close-grip push-ups", target: "Max reps"}, {name: "Dumbbell skullcrushers", target: "12 reps"}], rest: "60 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Plank-to-elbow", target: "60 seconds"}], rest: "30 seconds" }}
+        };
+
+        const exerciseMap = {
+            'Back & Biceps': ['Barbell bent-over row', 'One-arm dumbbell row', 'Barbell Curls', 'Hammer Curls', 'Dumbbell pullovers'],
+            'Chest & Triceps': ['Barbell Bench Press', 'Incline dumbbell press', 'Dumbbell overhead tricep extension', 'Close-grip push-ups', 'Incline barbell bench press', 'Dumbbell skullcrushers', 'Push-ups'],
+            'Legs': ['Barbell Squats', 'Dumbbell Romanian Deadlift', 'Walking Lunges', 'Calf Raises'],
+            'Shoulders': ['Dumbbell overhead press', 'Dumbbell lateral raises', 'Dumbbell rear delt fly'],
+            'Core': ['Plank', 'Side plank', 'Leg raises', 'Flutter kicks', 'Ab roller', 'Mountain climbers', 'Bicycle crunches', 'Lying Leg Raises', 'Plank-to-elbow']
+        };
+        const allExercises = [...new Set(Object.values(exerciseMap).flat())];
+        const bodyMeasurementMetrics = { weight: "Weight (kg)", bodyFat: "Body Fat %", waist: "Waist (cm)", chest: "Chest (cm)", arms: "Arms (cm)", legs: "Legs (cm)"};
+
+        let loggedWorkouts = [];
+        let bodyMeasurements = [];
+        let currentEditingDay = null;
+
+        const ui = {
+            workoutContainer: document.getElementById('workouts-container'),
+            nav: document.getElementById('workout-nav'),
+            logDayTitle: document.getElementById('log-day-title'),
+            exerciseSelect: document.getElementById('exercise-select'),
+            graphExerciseSelect: document.getElementById('graph-exercise-select'),
+            workoutLogForm: document.getElementById('workout-log-form'),
+            bodyLogForm: document.getElementById('body-log-form'),
+            graphMetricSelect: document.getElementById('graph-metric-select'),
+            bodyMetricsToggles: document.getElementById('body-metrics-toggles'),
+            editModal: document.getElementById('edit-modal'),
+            editModalTitle: document.getElementById('edit-modal-title'),
+            editModalBody: document.getElementById('edit-modal-body'),
+            cancelEditBtn: document.getElementById('cancel-edit-btn'),
+            saveEditBtn: document.getElementById('save-edit-btn'),
+            tipsModal: document.getElementById('tips-modal'),
+            tipsModalTitle: document.getElementById('tips-modal-title'),
+            tipsSpinner: document.getElementById('tips-spinner'),
+            tipsContent: document.getElementById('tips-content'),
+            closeTipsBtn: document.getElementById('close-tips-btn'),
+            getFormTipsBtn: document.getElementById('get-form-tips-btn'),
+            generateSummaryBtn: document.getElementById('generate-summary-btn'),
+            aiSummaryContainer: document.getElementById('ai-summary-container'),
+            aiSummarySpinner: document.getElementById('ai-summary-spinner'),
+            aiSummaryContent: document.getElementById('ai-summary-content'),
+        };
+        
+        async function callGemini(prompt, retries = 3, delay = 1000) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const payload = { contents: [{ parts: [{ text: prompt }] }] };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API call failed with status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                return result.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a response. Please try again.";
+            } catch (error) {
+                if (retries > 0) {
+                    await new Promise(res => setTimeout(res, delay));
+                    return callGemini(prompt, retries - 1, delay * 2);
+                }
+                return `An error occurred: ${error.message}. Please check your connection and try again.`;
+            }
+        }
+
+        function getMuscleGroupForExercise(exerciseName) {
+            for (const group in exerciseMap) {
+                if (exerciseMap[group].includes(exerciseName)) {
+                    return group;
+                }
+            }
+            return 'Other';
+        }
+        
+        function createWorkoutHTML(dayKey) {
+            const dayData = workoutData[dayKey];
+            const supersetHTML = dayData.supersets.map(ss => `<div><p class="font-semibold text-gray-800">${ss.title}</p><ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">${ss.exercises.map(ex => `<li>${ex.name}: ${ex.target}</li>`).join('')}<li class="text-[#003B73] font-medium list-none"><span class="font-bold">Rest:</span> ${ss.rest}</li></ul></div>`).join('');
+            const finisherHTML = `<div class="md:col-span-2 mt-2"><p class="font-semibold text-gray-800">${dayData.finisher.title}</p><ul class="list-disc list-inside text-gray-700 mt-2 space-y-1">${dayData.finisher.exercises.map(ex => `<li>${ex.name}: ${ex.target}</li>`).join('')}<li class="text-[#003B73] font-medium list-none"><span class="font-bold">Rest:</span> ${dayData.finisher.rest}</li></ul></div>`;
+            return `<div id="${dayKey}" class="workout-content"><div class="flex justify-between items-center border-b-2 border-[#00A6ED] pb-2 mb-6"><h3 class="text-xl font-bold text-[#0074D9]">${dayData.title}</h3><div><span class="text-sm font-medium text-white bg-[#00A6ED] py-1 px-3 rounded-full mr-2">${dayData.tag}</span><button data-day="${dayKey}" class="edit-plan-btn text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">Edit Plan</button></div></div><div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">${supersetHTML}${finisherHTML}</div></div>`;
+        }
+
+        function renderAllWorkouts() {
+            ui.workoutContainer.innerHTML = '';
+            Object.keys(workoutData).forEach(day => ui.workoutContainer.innerHTML += createWorkoutHTML(day));
+            const activeDay = document.querySelector('.nav-btn.active')?.dataset.target || 'monday';
+            document.getElementById(activeDay)?.classList.add('active');
+        }
+
+        function savePendingWorkout(dayKey) {
+            const pendingData = {
+                exercise: ui.exerciseSelect.value,
+                s1w: document.getElementById('set1-weight').value,
+                s1r: document.getElementById('set1-reps').value,
+                s2w: document.getElementById('set2-weight').value,
+                s2r: document.getElementById('set2-reps').value,
+                s3w: document.getElementById('set3-weight').value,
+                s3r: document.getElementById('set3-reps').value,
+            };
+            localStorage.setItem(`pendingWorkoutLog_${dayKey}`, JSON.stringify(pendingData));
+        }
+
+        function loadPendingWorkout(dayKey) {
+            const pendingDataJSON = localStorage.getItem(`pendingWorkoutLog_${dayKey}`);
+            ui.workoutLogForm.reset();
+            if (pendingDataJSON) {
+                const pendingData = JSON.parse(pendingDataJSON);
+                ui.exerciseSelect.value = pendingData.exercise || '';
+                document.getElementById('set1-weight').value = pendingData.s1w || '';
+                document.getElementById('set1-reps').value = pendingData.s1r || '';
+                document.getElementById('set2-weight').value = pendingData.s2w || '';
+                document.getElementById('set2-reps').value = pendingData.s2r || '';
+                document.getElementById('set3-weight').value = pendingData.s3w || '';
+                document.getElementById('set3-reps').value = pendingData.s3r || '';
+            }
+        }
+
+        function updateLogForm(dayKey) {
+            const dayExercises = [...workoutData[dayKey].supersets.flatMap(ss => ss.exercises), ...workoutData[dayKey].finisher.exercises].map(ex => ex.name);
+            const currentSelectedExercise = ui.exerciseSelect.value;
+            ui.exerciseSelect.innerHTML = dayExercises.map(ex => `<option value="${ex}">${ex}</option>`).join('');
+            
+            if (dayExercises.includes(currentSelectedExercise)) {
+                ui.exerciseSelect.value = currentSelectedExercise;
+            }
+
+            ui.logDayTitle.textContent = dayKey.charAt(0).toUpperCase() + dayKey.slice(1);
+            loadPendingWorkout(dayKey);
+        }
+
+        function populateUI() {
+            renderAllWorkouts();
+            updateLogForm('monday');
+            
+            allExercises.sort().forEach(ex => {
+                ui.graphExerciseSelect.innerHTML += `<option value="${ex}">${ex}</option>`;
+            });
+
+            Object.entries(bodyMeasurementMetrics).forEach(([key, label]) => {
+                ui.bodyMetricsToggles.innerHTML += `<div class="flex items-center"><input id="toggle-${key}" type="checkbox" data-metric="${key}" class="h-4 w-4 text-[#0074D9] focus:ring-[#003B73] border-gray-300 rounded" ${key === 'weight' ? 'checked' : ''}><label for="toggle-${key}" class="ml-2 text-sm text-gray-600">${label}</label></div>`;
+            });
+        }
+        
+        function openEditModal(dayKey) {
+            currentEditingDay = dayKey;
+            const dayData = workoutData[dayKey];
+            ui.editModalTitle.textContent = `Edit ${dayData.title} Workout`;
+            let modalHTML = '';
+            
+            const exerciseOptions = allExercises.map(ex => `<option value="${ex}">${ex}</option>`).join('');
+
+            dayData.supersets.forEach((ss, ssIndex) => {
+                modalHTML += `<div class="p-2 border rounded"><p class="font-semibold">${ss.title}</p>`;
+                ss.exercises.forEach((ex, exIndex) => {
+                    modalHTML += `<div class="grid grid-cols-2 gap-2 mt-2"><select data-ss="${ssIndex}" data-ex="${exIndex}" class="w-full">${exerciseOptions.replace(`value="${ex.name}"`, `value="${ex.name}" selected`)}</select><input type="text" value="${ex.target}" data-ss="${ssIndex}" data-ex="${exIndex}" class="w-full" placeholder="Reps/Time"></div>`;
+                });
+                modalHTML += '</div>';
+            });
+            
+            modalHTML += `<div class="p-2 border rounded mt-2"><p class="font-semibold">${dayData.finisher.title}</p>`;
+            dayData.finisher.exercises.forEach((ex, exIndex) => {
+                 modalHTML += `<div class="grid grid-cols-2 gap-2 mt-2"><select data-finisher data-ex="${exIndex}" class="w-full">${exerciseOptions.replace(`value="${ex.name}"`, `value="${ex.name}" selected`)}</select><input type="text" value="${ex.target}" data-finisher data-ex="${exIndex}" class="w-full" placeholder="Reps/Time"></div>`;
+            });
+            modalHTML += '</div>';
+            
+            ui.editModalBody.innerHTML = modalHTML;
+            ui.editModal.classList.remove('hidden');
+            setTimeout(() => ui.editModal.classList.remove('opacity-0'), 10);
+        }
+        
+        function closeEditModal() {
+            ui.editModal.classList.add('opacity-0');
+            setTimeout(() => ui.editModal.classList.add('hidden'), 300);
+        }
+
+        function saveWorkoutChanges() {
+            if (!currentEditingDay) return;
+            const dayData = workoutData[currentEditingDay];
+            
+            dayData.supersets.forEach((ss, ssIndex) => {
+                ss.exercises.forEach((ex, exIndex) => {
+                    ex.name = document.querySelector(`select[data-ss='${ssIndex}'][data-ex='${exIndex}']`).value;
+                    ex.target = document.querySelector(`input[data-ss='${ssIndex}'][data-ex='${exIndex}']`).value;
+                });
+            });
+            dayData.finisher.exercises.forEach((ex, exIndex) => {
+                ex.name = document.querySelector(`select[data-finisher][data-ex='${exIndex}']`).value;
+                ex.target = document.querySelector(`input[data-finisher][data-ex='${exIndex}']`).value;
+            });
+
+            renderAllWorkouts();
+            updateLogForm(currentEditingDay);
+            closeEditModal();
+        }
+
+        const charts = {};
+        function createChart(id, type, data, options) {
+            const ctx = document.getElementById(id).getContext('2d');
+            charts[id] = new Chart(ctx, { type, data, options });
+        }
+        
+        function updateAllCharts() {
+            updateWorkoutChart();
+            updateBodyChart();
+            updateTotalVolumeChart();
+            updateMuscleGroupChart();
+        }
+        
+        function updateWorkoutChart() {
+            const selectedExercise = ui.graphExerciseSelect.value;
+            const selectedMetric = ui.graphMetricSelect.value;
+            const filteredData = loggedWorkouts.filter(w => w.exercise === selectedExercise);
+            const chart = charts['workoutProgressChart'];
+            chart.data.labels = filteredData.map(w => w.date);
+            chart.data.datasets[0].data = filteredData.map(w => w[selectedMetric]);
+            chart.data.datasets[0].label = `${selectedExercise} - ${ui.graphMetricSelect.options[ui.graphMetricSelect.selectedIndex].text}`;
+            chart.update();
+        }
+
+        function updateBodyChart() {
+            const activeMetrics = Array.from(ui.bodyMetricsToggles.querySelectorAll('input:checked')).map(input => input.dataset.metric);
+            const chart = charts['bodyProgressChart'];
+            chart.data.labels = bodyMeasurements.map(m => m.date);
+            chart.data.datasets = activeMetrics.map((metric, i) => {
+                const colors = ['#003B73', '#0074D9', '#4192D9', '#7ABAF2', '#00A6ED', '#00C4FF'];
+                return { label: bodyMeasurementMetrics[metric], data: bodyMeasurements.map(m => m[metric]), borderColor: colors[i % colors.length], fill: false, tension: 0.1 };
+            });
+            chart.update();
+        }
+
+        function updateTotalVolumeChart() {
+            const chart = charts['totalVolumeChart'];
+            const weeklyVolume = loggedWorkouts.reduce((acc, workout) => {
+                const week = `Week ${new Date(workout.date).getWeek()}`;
+                acc[week] = (acc[week] || 0) + workout.volume;
+                return acc;
+            }, {});
+            chart.data.labels = Object.keys(weeklyVolume);
+            chart.data.datasets[0].data = Object.values(weeklyVolume);
+            chart.update();
+        }
+
+        function updateMuscleGroupChart() {
+            const chart = charts['muscleGroupChart'];
+            const volumeByGroup = loggedWorkouts.reduce((acc, workout) => {
+                const group = getMuscleGroupForExercise(workout.exercise);
+                acc[group] = (acc[group] || 0) + workout.volume;
+                return acc;
+            }, {});
+            chart.data.labels = Object.keys(volumeByGroup);
+            chart.data.datasets[0].data = Object.values(volumeByGroup);
+            chart.update();
+        }
+
+        Date.prototype.getWeek = function() {
+            var date = new Date(this.getTime());
+            date.setHours(0, 0, 0, 0);
+            date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+            var week1 = new Date(date.getFullYear(), 0, 4);
+            return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            populateUI();
+            
+            createChart('workoutProgressChart', 'line', { labels: [], datasets: [{ label: '', data: [], borderColor: '#003B73', tension: 0.1 }] }, { responsive: true, maintainAspectRatio: false });
+            createChart('bodyProgressChart', 'line', { labels: [], datasets: [] }, { responsive: true, maintainAspectRatio: false });
+            createChart('totalVolumeChart', 'bar', { labels: [], datasets: [{ label: 'Total Volume (kg)', data: [], backgroundColor: '#0074D9' }] }, { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } });
+            createChart('muscleGroupChart', 'doughnut', { labels: [], datasets: [{ data: [], backgroundColor: ['#003B73', '#0074D9', '#4192D9', '#7ABAF2', '#00A6ED'] }] }, { responsive: true, maintainAspectRatio: false });
+
+            updateAllCharts();
+            loadPendingWorkout('monday');
+        });
+        
+        ui.nav.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                const oldDay = document.querySelector('.nav-btn.active')?.dataset.target;
+                if (oldDay) {
+                    savePendingWorkout(oldDay);
+                }
+                const targetId = e.target.dataset.target;
+                ui.nav.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                ui.workoutContainer.querySelectorAll('.workout-content').forEach(content => content.classList.remove('active'));
+                document.getElementById(targetId).classList.add('active');
+                updateLogForm(targetId);
+            }
+        });
+
+        ui.workoutContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('edit-plan-btn')) {
+                openEditModal(e.target.dataset.day);
+            }
+        });
+        
+        ui.cancelEditBtn.addEventListener('click', closeEditModal);
+        ui.saveEditBtn.addEventListener('click', saveWorkoutChanges);
+        
+        ui.workoutLogForm.addEventListener('input', () => {
+            const activeDay = document.querySelector('.nav-btn.active')?.dataset.target;
+            if (activeDay) {
+                savePendingWorkout(activeDay);
+            }
+        });
+
+        ui.workoutLogForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const s1w = parseFloat(formData.get('s1w')) || 0, s1r = parseInt(formData.get('s1r')) || 0;
+            const s2w = parseFloat(formData.get('s2w')) || 0, s2r = parseInt(formData.get('s2r')) || 0;
+            const s3w = parseFloat(formData.get('s3w')) || 0, s3r = parseInt(formData.get('s3r')) || 0;
+            
+            loggedWorkouts.push({
+                date: new Date().toISOString().split('T')[0],
+                exercise: formData.get('exercise'),
+                maxWeight: Math.max(s1w, s2w, s3w),
+                totalReps: s1r + s2r + s3r,
+                volume: (s1w * s1r) + (s2w * s2r) + (s3w * s3r)
+            });
+            
+            const activeDay = document.querySelector('.nav-btn.active')?.dataset.target;
+            if(activeDay) {
+                localStorage.removeItem(`pendingWorkoutLog_${activeDay}`);
+            }
+
+            e.target.reset();
+            ui.generateSummaryBtn.disabled = false;
+            updateAllCharts();
+            alert('Workout Logged!');
+        });
+
+        ui.bodyLogForm.addEventListener('submit', (e) => {
+             e.preventDefault();
+             bodyMeasurements.push({
+                date: new Date().toISOString().split('T')[0],
+                weight: parseFloat(document.getElementById('body-weight').value) || 0,
+                bodyFat: parseFloat(document.getElementById('body-fat').value) || 0,
+                waist: parseFloat(document.getElementById('waist').value) || 0,
+                chest: parseFloat(document.getElementById('chest').value) || 0,
+                arms: parseFloat(document.getElementById('arms').value) || 0,
+                legs: parseFloat(document.getElementById('legs').value) || 0,
+             });
+             e.target.reset();
+             updateAllCharts();
+             alert('Measurements Logged!');
+        });
+        
+        ui.graphExerciseSelect.addEventListener('change', updateWorkoutChart);
+        ui.graphMetricSelect.addEventListener('change', updateWorkoutChart);
+        ui.bodyMetricsToggles.addEventListener('change', updateBodyChart);
+        
+        function openTipsModal() {
+            ui.tipsModal.classList.remove('hidden');
+            setTimeout(() => ui.tipsModal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeTipsModal() {
+            ui.tipsModal.classList.add('opacity-0');
+            setTimeout(() => ui.tipsModal.classList.add('hidden'), 300);
+        }
+
+        ui.getFormTipsBtn.addEventListener('click', async () => {
+            const exercise = ui.exerciseSelect.value;
+            ui.tipsModalTitle.textContent = `Form Tips for ${exercise}`;
+            ui.tipsContent.innerHTML = '';
+            ui.tipsSpinner.classList.remove('hidden');
+            openTipsModal();
+
+            const prompt = `Provide concise, actionable tips for proper form on the "${exercise}" exercise. Also, list 2-3 common mistakes to avoid. Format the response as simple HTML with headings and bullet points.`;
+            const response = await callGemini(prompt);
+            
+            ui.tipsContent.innerHTML = response;
+            ui.tipsSpinner.classList.add('hidden');
+        });
+
+        ui.closeTipsBtn.addEventListener('click', closeTipsModal);
+
+        ui.generateSummaryBtn.addEventListener('click', async () => {
+            ui.aiSummaryContainer.classList.remove('hidden');
+            ui.aiSummaryContent.innerHTML = '';
+            ui.aiSummarySpinner.classList.remove('hidden');
+
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            const recentWorkouts = loggedWorkouts.filter(w => new Date(w.date) >= oneWeekAgo);
+            
+            if (recentWorkouts.length === 0) {
+                 ui.aiSummaryContent.innerHTML = "<p>No workouts logged in the last 7 days. Log some workouts to get a summary!</p>";
+                 ui.aiSummarySpinner.classList.add('hidden');
+                 return;
+            }
+
+            const workoutString = recentWorkouts.map(w => `${w.date} - ${w.exercise}: Volume=${w.volume}kg, Max Weight=${w.maxWeight}kg, Total Reps=${w.totalReps}`).join('; ');
+            const prompt = `Act as an expert fitness coach. Based on the following workout data from the last 7 days, provide a concise summary of my performance. Highlight my strongest lifts and any potential muscle group imbalances based on the volume distribution. Suggest one key area to focus on for next week to improve. Format the response as simple HTML with a heading, paragraphs, and bullet points. My weekly log: ${workoutString}`;
+
+            const response = await callGemini(prompt);
+            ui.aiSummaryContent.innerHTML = response;
+            ui.aiSummarySpinner.classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>
+
