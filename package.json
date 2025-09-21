@@ -1,14 +1,12 @@
 {
   "name": "tsvetanov-workout-app",
   "version": "1.0.0",
-  "description": "A workout dashboard with a Node.js backend and SQLite database.",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "description": "A workout dashboard with a Vercel-compatible serverless backend and Vercel Blob storage.",
+  "main": "api/index.js",
   "dependencies": {
+    "@vercel/blob": "^0.23.2",
     "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "sqlite3": "^5.1.7"
+    "express": "^4.19.2"
   }
 }
+

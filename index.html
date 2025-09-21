@@ -219,7 +219,7 @@
 
 
     <script>
-        const API_URL = '/api';
+        const API_URL = 'http://localhost:3000/api';
 
         let workoutData = {};
         const exerciseMap = {
@@ -315,7 +315,6 @@
         }
 
         function updateLogForm(dayKey) {
-            if(!workoutData[dayKey]) return;
             const dayExercises = [...workoutData[dayKey].supersets.flatMap(ss => ss.exercises), ...workoutData[dayKey].finisher.exercises].map(ex => ex.name);
             const currentSelectedExercise = ui.exerciseSelect.value;
             ui.exerciseSelect.innerHTML = dayExercises.map(ex => `<option value="${ex}">${ex}</option>`).join('');
@@ -405,9 +404,6 @@
         const charts = {};
         function createChart(id, type, data, options) {
             const ctx = document.getElementById(id).getContext('2d');
-            if (charts[id]) {
-                charts[id].destroy();
-            }
             charts[id] = new Chart(ctx, { type, data, options });
         }
         
@@ -494,7 +490,7 @@
 
             } catch(error) {
                 console.error("Failed to load data from server:", error);
-                alert("Could not connect to the server. Please make sure it's running and you're on the right URL.");
+                alert("Could not connect to the server. Please make sure it's running.");
             }
         }
         
@@ -648,3 +644,4 @@
     </script>
 </body>
 </html>
+
