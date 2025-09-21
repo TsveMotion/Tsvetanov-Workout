@@ -219,14 +219,9 @@
 
 
     <script>
-        let workoutData = {
-            monday: { title: "Chest & Triceps", tag: "Swim Day", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Barbell Bench Press", target: "8-10 reps"}, {name: "Dumbbell Overhead Tricep Extension", target: "12 reps"}], rest: "75 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "Incline Dumbbell Press", target: "10-12 reps"}, {name: "Push-ups", target: "Max reps"}], rest: "60 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Lying Leg Raises", target: "15 reps"}], rest: "30 seconds" }},
-            tuesday: { title: "Legs", tag: "Walk Only", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Barbell Squats", target: "10 reps"}, {name: "Calf Raises", target: "20 reps"}], rest: "90 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "Dumbbell Romanian Deadlift", target: "10 reps"}, {name: "Walking Lunges", target: "10 reps each leg"}], rest: "75 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Plank", target: "60 seconds"}], rest: "30 seconds" }},
-            wednesday: { title: "Back & Biceps", tag: "Swim Day", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Barbell bent-over row", target: "10-12 reps"}, {name: "Hammer Curls", target: "12 reps"}], rest: "75 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "One-arm dumbbell row", target: "12 reps each side"}, {name: "Barbell Curls", target: "12 reps"}], rest: "60 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Ab roller", target: "8-10 reps"}], rest: "30 seconds" }},
-            thursday: { title: "Shoulders & Core", tag: "Swim Day", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Dumbbell overhead press", target: "10-12 reps"}, {name: "Dumbbell lateral raises", target: "12 reps"}], rest: "75 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "Dumbbell rear delt fly", target: "12 reps"}, {name: "Mountain climbers", target: "30 seconds"}], rest: "60 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Bicycle crunches", target: "20 reps"}, {name: "Flutter kicks", target: "30 seconds"}], rest: "45 seconds" }},
-            friday: { title: "Arms & Endurance", tag: "Swim Day", supersets: [{ title: "Superset 1 (3 Rounds)", exercises: [{name: "Incline barbell bench press", target: "8-10 reps"}, {name: "Barbell Curls", target: "12 reps"}], rest: "75 seconds" }, { title: "Superset 2 (2 Rounds)", exercises: [{name: "Close-grip push-ups", target: "Max reps"}, {name: "Dumbbell skullcrushers", target: "12 reps"}], rest: "60 seconds" }], finisher: { title: "Core Finisher (2 Rounds)", exercises: [{name: "Plank-to-elbow", target: "60 seconds"}], rest: "30 seconds" }}
-        };
+        const API_URL = '/api';
 
+        let workoutData = {};
         const exerciseMap = {
             'Back & Biceps': ['Barbell bent-over row', 'One-arm dumbbell row', 'Barbell Curls', 'Hammer Curls', 'Dumbbell pullovers'],
             'Chest & Triceps': ['Barbell Bench Press', 'Incline dumbbell press', 'Dumbbell overhead tricep extension', 'Close-grip push-ups', 'Incline barbell bench press', 'Dumbbell skullcrushers', 'Push-ups'],
@@ -269,7 +264,7 @@
         };
         
         async function callGemini(prompt, retries = 3, delay = 1000) {
-            const apiKey = "AIzaSyAkLMf-Cb3OO_l00alL9OXPTt25MWGmcbM";
+            const apiKey = "";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
             
             const payload = { contents: [{ parts: [{ text: prompt }] }] };
@@ -319,35 +314,8 @@
             document.getElementById(activeDay)?.classList.add('active');
         }
 
-        function savePendingWorkout(dayKey) {
-            const pendingData = {
-                exercise: ui.exerciseSelect.value,
-                s1w: document.getElementById('set1-weight').value,
-                s1r: document.getElementById('set1-reps').value,
-                s2w: document.getElementById('set2-weight').value,
-                s2r: document.getElementById('set2-reps').value,
-                s3w: document.getElementById('set3-weight').value,
-                s3r: document.getElementById('set3-reps').value,
-            };
-            localStorage.setItem(`pendingWorkoutLog_${dayKey}`, JSON.stringify(pendingData));
-        }
-
-        function loadPendingWorkout(dayKey) {
-            const pendingDataJSON = localStorage.getItem(`pendingWorkoutLog_${dayKey}`);
-            ui.workoutLogForm.reset();
-            if (pendingDataJSON) {
-                const pendingData = JSON.parse(pendingDataJSON);
-                ui.exerciseSelect.value = pendingData.exercise || '';
-                document.getElementById('set1-weight').value = pendingData.s1w || '';
-                document.getElementById('set1-reps').value = pendingData.s1r || '';
-                document.getElementById('set2-weight').value = pendingData.s2w || '';
-                document.getElementById('set2-reps').value = pendingData.s2r || '';
-                document.getElementById('set3-weight').value = pendingData.s3w || '';
-                document.getElementById('set3-reps').value = pendingData.s3r || '';
-            }
-        }
-
         function updateLogForm(dayKey) {
+            if(!workoutData[dayKey]) return;
             const dayExercises = [...workoutData[dayKey].supersets.flatMap(ss => ss.exercises), ...workoutData[dayKey].finisher.exercises].map(ex => ex.name);
             const currentSelectedExercise = ui.exerciseSelect.value;
             ui.exerciseSelect.innerHTML = dayExercises.map(ex => `<option value="${ex}">${ex}</option>`).join('');
@@ -357,7 +325,6 @@
             }
 
             ui.logDayTitle.textContent = dayKey.charAt(0).toUpperCase() + dayKey.slice(1);
-            loadPendingWorkout(dayKey);
         }
 
         function populateUI() {
@@ -405,7 +372,7 @@
             setTimeout(() => ui.editModal.classList.add('hidden'), 300);
         }
 
-        function saveWorkoutChanges() {
+        async function saveWorkoutChanges() {
             if (!currentEditingDay) return;
             const dayData = workoutData[currentEditingDay];
             
@@ -419,15 +386,28 @@
                 ex.name = document.querySelector(`select[data-finisher][data-ex='${exIndex}']`).value;
                 ex.target = document.querySelector(`input[data-finisher][data-ex='${exIndex}']`).value;
             });
-
-            renderAllWorkouts();
-            updateLogForm(currentEditingDay);
-            closeEditModal();
+            
+            try {
+                await fetch(`${API_URL}/plan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ day: currentEditingDay, plan_data: dayData })
+                });
+                renderAllWorkouts();
+                updateLogForm(currentEditingDay);
+                closeEditModal();
+            } catch (error) {
+                console.error("Failed to save workout plan:", error);
+                alert("Error: Could not save plan to the server.");
+            }
         }
 
         const charts = {};
         function createChart(id, type, data, options) {
             const ctx = document.getElementById(id).getContext('2d');
+            if (charts[id]) {
+                charts[id].destroy();
+            }
             charts[id] = new Chart(ctx, { type, data, options });
         }
         
@@ -492,24 +472,43 @@
             return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
         }
         
-        document.addEventListener('DOMContentLoaded', () => {
-            populateUI();
-            
+        async function loadInitialData() {
+            try {
+                const response = await fetch(`${API_URL}/data`);
+                const data = await response.json();
+                
+                if (data.plan && data.plan.length > 0) {
+                    workoutData = data.plan.reduce((acc, row) => {
+                        acc[row.day] = JSON.parse(row.plan_data);
+                        return acc;
+                    }, {});
+                }
+                
+                loggedWorkouts = data.loggedWorkouts || [];
+                bodyMeasurements = data.bodyMeasurements || [];
+
+                populateUI();
+                createAllCharts();
+                updateAllCharts();
+                if(loggedWorkouts.length > 0) ui.generateSummaryBtn.disabled = false;
+
+            } catch(error) {
+                console.error("Failed to load data from server:", error);
+                alert("Could not connect to the server. Please make sure it's running and you're on the right URL.");
+            }
+        }
+        
+        function createAllCharts() {
             createChart('workoutProgressChart', 'line', { labels: [], datasets: [{ label: '', data: [], borderColor: '#003B73', tension: 0.1 }] }, { responsive: true, maintainAspectRatio: false });
             createChart('bodyProgressChart', 'line', { labels: [], datasets: [] }, { responsive: true, maintainAspectRatio: false });
             createChart('totalVolumeChart', 'bar', { labels: [], datasets: [{ label: 'Total Volume (kg)', data: [], backgroundColor: '#0074D9' }] }, { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } });
             createChart('muscleGroupChart', 'doughnut', { labels: [], datasets: [{ data: [], backgroundColor: ['#003B73', '#0074D9', '#4192D9', '#7ABAF2', '#00A6ED'] }] }, { responsive: true, maintainAspectRatio: false });
-
-            updateAllCharts();
-            loadPendingWorkout('monday');
-        });
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadInitialData);
         
         ui.nav.addEventListener('click', (e) => {
             if (e.target.tagName === 'BUTTON') {
-                const oldDay = document.querySelector('.nav-btn.active')?.dataset.target;
-                if (oldDay) {
-                    savePendingWorkout(oldDay);
-                }
                 const targetId = e.target.dataset.target;
                 ui.nav.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
                 e.target.classList.add('active');
@@ -528,53 +527,68 @@
         ui.cancelEditBtn.addEventListener('click', closeEditModal);
         ui.saveEditBtn.addEventListener('click', saveWorkoutChanges);
         
-        ui.workoutLogForm.addEventListener('input', () => {
-            const activeDay = document.querySelector('.nav-btn.active')?.dataset.target;
-            if (activeDay) {
-                savePendingWorkout(activeDay);
-            }
-        });
-
-        ui.workoutLogForm.addEventListener('submit', (e) => {
+        ui.workoutLogForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const s1w = parseFloat(formData.get('s1w')) || 0, s1r = parseInt(formData.get('s1r')) || 0;
             const s2w = parseFloat(formData.get('s2w')) || 0, s2r = parseInt(formData.get('s2r')) || 0;
             const s3w = parseFloat(formData.get('s3w')) || 0, s3r = parseInt(formData.get('s3r')) || 0;
             
-            loggedWorkouts.push({
+            const newLog = {
                 date: new Date().toISOString().split('T')[0],
                 exercise: formData.get('exercise'),
                 maxWeight: Math.max(s1w, s2w, s3w),
                 totalReps: s1r + s2r + s3r,
                 volume: (s1w * s1r) + (s2w * s2r) + (s3w * s3r)
-            });
+            };
             
-            const activeDay = document.querySelector('.nav-btn.active')?.dataset.target;
-            if(activeDay) {
-                localStorage.removeItem(`pendingWorkoutLog_${activeDay}`);
-            }
+            try {
+                const response = await fetch(`${API_URL}/workouts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newLog)
+                });
+                if(!response.ok) throw new Error("Server responded with an error.");
 
-            e.target.reset();
-            ui.generateSummaryBtn.disabled = false;
-            updateAllCharts();
-            alert('Workout Logged!');
+                loggedWorkouts.push(newLog);
+                e.target.reset();
+                ui.generateSummaryBtn.disabled = false;
+                updateAllCharts();
+                alert('Workout Logged!');
+            } catch(error) {
+                console.error("Failed to log workout:", error);
+                alert("Error: Could not save workout to the server.");
+            }
         });
 
-        ui.bodyLogForm.addEventListener('submit', (e) => {
+        ui.bodyLogForm.addEventListener('submit', async (e) => {
              e.preventDefault();
-             bodyMeasurements.push({
+             const newMeasurement = {
                 date: new Date().toISOString().split('T')[0],
-                weight: parseFloat(document.getElementById('body-weight').value) || 0,
-                bodyFat: parseFloat(document.getElementById('body-fat').value) || 0,
-                waist: parseFloat(document.getElementById('waist').value) || 0,
-                chest: parseFloat(document.getElementById('chest').value) || 0,
-                arms: parseFloat(document.getElementById('arms').value) || 0,
-                legs: parseFloat(document.getElementById('legs').value) || 0,
-             });
-             e.target.reset();
-             updateAllCharts();
-             alert('Measurements Logged!');
+                weight: parseFloat(document.getElementById('body-weight').value) || null,
+                bodyFat: parseFloat(document.getElementById('body-fat').value) || null,
+                waist: parseFloat(document.getElementById('waist').value) || null,
+                chest: parseFloat(document.getElementById('chest').value) || null,
+                arms: parseFloat(document.getElementById('arms').value) || null,
+                legs: parseFloat(document.getElementById('legs').value) || null,
+             };
+             
+             try {
+                const response = await fetch(`${API_URL}/measurements`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newMeasurement)
+                });
+                if(!response.ok) throw new Error("Server responded with an error.");
+
+                bodyMeasurements.push(newMeasurement);
+                e.target.reset();
+                updateAllCharts();
+                alert('Measurements Logged!');
+             } catch(error) {
+                console.error("Failed to log measurements:", error);
+                alert("Error: Could not save measurements to the server.");
+             }
         });
         
         ui.graphExerciseSelect.addEventListener('change', updateWorkoutChart);
@@ -634,4 +648,3 @@
     </script>
 </body>
 </html>
-
