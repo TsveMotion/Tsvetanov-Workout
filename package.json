@@ -1,0 +1,14 @@
+{
+  "name": "tsvetanov-workout-app",
+  "version": "1.0.0",
+  "description": "A workout dashboard with a Node.js backend and SQLite database.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7"
+  }
+}
